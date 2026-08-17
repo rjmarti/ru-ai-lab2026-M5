@@ -54,3 +54,41 @@ líneas / 64.28% branches globales**. Por paquete: `SsoAdmin.API` 100%/100%,
 3. Agregar tests de sad-path de `ValidarNombre` en `UsuarioServiceTests` (nombre vacío, >200
    caracteres).
 4. Agregar test de `Logout` (0% de cobertura, único flujo de sesión activa sin ningún test).
+
+## Ronda 2 — 2026-08-17T19:12:38Z — PASSED
+
+Corrección aplicada: eliminadas `Pages/Index`/`Privacy`/`Error` (scaffold no solicitado,
+confirmado por el usuario); `Program.cs` ajustado (manejo de error genérico sin depender de
+`/Error`, `/` redirige a `/Usuarios`); 10 tests nuevos (happy/sad path de `Create`/`Edit`, happy
+path de baja lógica, 3 sad-path de `ValidarNombre`, 1 test de `Logout`).
+
+`dotnet build` → 0 errores. `dotnet test` → 35/35 en verde, dos corridas consecutivas sin
+flakiness. Cobertura recalculada independientemente por el verificador desde
+`coverage.cobertura.xml`:
+
+| Paquete | Líneas | Branches |
+|---|---|---|
+| Global | 92.37% (400/433) | 86.04% (74/86) |
+| SsoAdmin.API | 100.00% | 100.00% |
+| SsoAdmin.Application | 100.00% | 100.00% |
+| SsoAdmin.Data | 93.16% | 100.00% |
+| SsoAdmin.Models | 83.33% | 100.00% |
+| SsoAdmin.Web | 87.50% | 82.85% |
+
+| Regla | Ronda 1 | Ronda 2 |
+|---|---|---|
+| F-VER-01 (AC-07/08/09) | WARN (solo nivel servicio) | ✅ PASS (nivel web agregado) |
+| F-VER-03 (cobertura ≥80%) | ❌ FAIL (79.09%/64.28%) | ✅ PASS (92.37%/86.04%, todos los paquetes) |
+| F-VER-04 (sad-path) | ❌ FAIL (Create/Edit sin tests) | ✅ PASS (happy+sad path en los 3 handlers) |
+| W-VER-01 (scaffold no solicitado) | WARN | ✅ resuelto (eliminado) |
+| W-VER-02 (rama de negocio <90%) | WARN (87.5%) | ✅ resuelto (100%) |
+
+F-VER-02, F-VER-05, F-VER-06 y W-VER-03 no se re-verificaron en esta ronda porque el diff no tocó
+ese código (ya habían pasado en ronda 1 y siguen siendo válidos).
+
+Auditoría de arquitectura sobre el loop correctivo: PASSED (0 FAILs, 4 warnings menores de
+mantenimiento de tests — duplicación de helpers entre archivos de test, no bloqueante).
+
+`/daw-security-sast` (ronda 2, sobre los archivos tocados): PASSED, 0 vulnerabilidades nuevas.
+
+**Veredicto: PASSED.** `gates.verify` = `true`.
