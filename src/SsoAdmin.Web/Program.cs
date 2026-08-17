@@ -54,7 +54,20 @@ WebApplication app = builder.Build();
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
-    app.UseExceptionHandler("/Error");
+    // No hay una página `/Error` propia (el scaffold por defecto de `dotnet new webapp` se
+    // eliminó: sin relación con ningún FR/AC del PRD). Se usa el overload de
+    // `UseExceptionHandler` que recibe un `IApplicationBuilder` de fallback en vez de un path de
+    // Razor Page: evita depender de una página que no existe y mantiene la respuesta genérica sin
+    // filtrar detalles del error (mitigación de exposición de información en una app de
+    // administración interna).
+    app.UseExceptionHandler(exceptionHandlerApp =>
+    {
+        exceptionHandlerApp.Run(async context =>
+        {
+            context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+            await context.Response.WriteAsync("Ha ocurrido un error.");
+        });
+    });
     // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
@@ -67,6 +80,12 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapStaticAssets();
+
+// La página `/Index` (scaffold por defecto) se eliminó: no hay landing page propia. La raíz
+// redirige directamente al listado de usuarios, que ya resuelve su propio redirect a `/Login` vía
+// `[Authorize]` si no hay sesión.
+app.MapGet("/", () => Results.Redirect("/Usuarios"));
+
 app.MapRazorPages()
    .WithStaticAssets();
 

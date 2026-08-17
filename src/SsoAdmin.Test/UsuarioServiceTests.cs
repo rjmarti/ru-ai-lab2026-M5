@@ -134,4 +134,26 @@ public class UsuarioServiceTests : IAsyncLifetime
 
         Assert.Null(resultado);
     }
+
+    [Fact]
+    public async Task CrearAsync_ConNombreVacioOSoloEspacios_LanzaArgumentException()
+    {
+        await Assert.ThrowsAsync<ArgumentException>(() => _sut.CrearAsync("   "));
+    }
+
+    [Fact]
+    public async Task CrearAsync_ConNombreMayorA200Caracteres_LanzaArgumentException()
+    {
+        string nombreLargo = new string('a', 201);
+
+        await Assert.ThrowsAsync<ArgumentException>(() => _sut.CrearAsync(nombreLargo));
+    }
+
+    [Fact]
+    public async Task EditarNombreAsync_ConNombreVacioSobreIdExistente_LanzaArgumentException()
+    {
+        UsuarioDto creado = await _sut.CrearAsync("Juan");
+
+        await Assert.ThrowsAsync<ArgumentException>(() => _sut.EditarNombreAsync(creado.Id, "   "));
+    }
 }

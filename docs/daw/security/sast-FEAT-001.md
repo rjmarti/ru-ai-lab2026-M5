@@ -79,3 +79,11 @@ Ninguna — no hubo hallazgos Medium/Low que requirieran supresión documentada.
 | 🟢 Low/Informational | 0 |
 
 **Total: 0 vulnerabilidades. Result: PASSED.**
+
+## Ronda 2 — 2026-08-17T18:59Z (loop correctivo VERIFY → CODE)
+
+Re-scan sobre los archivos tocados en el loop correctivo (eliminación de `Pages/Index`/`Privacy`/
+`Error`, ajuste de `Program.cs`, 10 tests nuevos): sin secretos nuevos, sin SQL crudo, sin
+`Html.Raw`/antiforgery deshabilitado, sin `ex.Message`/`StackTrace` expuesto en el nuevo manejador
+de errores de `Program.cs`. `dotnet list package --vulnerable` sigue en 0 para los 6 proyectos.
+**Result: PASSED.**

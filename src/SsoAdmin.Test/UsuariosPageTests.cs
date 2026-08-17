@@ -3,6 +3,7 @@ extern alias WebHost;
 using System.Net;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using SsoAdmin.Data;
@@ -192,6 +193,201 @@ public class UsuariosPageTests : IDisposable
         HttpResponseMessage response = await client.PostAsync("/Usuarios?handler=DarDeBaja&id=9999", new FormUrlEncodedContent(form));
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    /// <summary>
+    /// Cuenta los usuarios persistidos, resolviendo <see cref="SsoAdminDbContext"/> desde el
+    /// <see cref="WebApplicationFactory{TEntryPoint}.Services"/> real del host bajo test, con el
+    /// mismo criterio que <see cref="SeedUsuarioAsync"/>.
+    /// </summary>
+    private async Task<int> ContarUsuariosAsync()
+    {
+        using IServiceScope scope = _factory.Services.CreateScope();
+        SsoAdminDbContext db = scope.ServiceProvider.GetRequiredService<SsoAdminDbContext>();
+
+        return await db.Usuarios.CountAsync();
+    }
+
+    [Fact]
+    public async Task PostCreate_ConNombreValido_RedirigeYElListadoMuestraElNuevoUsuarioActivo()
+    {
+        using HttpClient client = CreateAuthenticatedClient(allowAutoRedirect: false);
+
+        await LoginAsAdminAsync(client);
+
+        string token = await GetAntiforgeryTokenAsync(client, "/Usuarios/Create");
+
+        Dictionary<string, string> form = new()
+        {
+            ["Nombre"] = "Usuario Creado Por Test",
+            ["__RequestVerificationToken"] = token,
+        };
+
+        HttpResponseMessage response = await client.PostAsync("/Usuarios/Create", new FormUrlEncodedContent(form));
+
+        Assert.Equal(HttpStatusCode.Found, response.StatusCode);
+
+        using HttpClient listadoClient = CreateAuthenticatedClient();
+        await LoginAsAdminAsync(listadoClient);
+        HttpResponseMessage listado = await listadoClient.GetAsync("/Usuarios");
+        string body = await listado.Content.ReadAsStringAsync();
+
+        Assert.Matches(
+            new Regex(@"<td>Usuario Creado Por Test</td>\s*<td>Activo</td>"),
+            body);
+    }
+
+    [Fact]
+    public async Task PostCreate_ConNombreVacio_NoRedirigeYNoCreaElUsuario()
+    {
+        using HttpClient client = CreateAuthenticatedClient(allowAutoRedirect: false);
+
+        await LoginAsAdminAsync(client);
+
+        int cantidadAntes = await ContarUsuariosAsync();
+
+        string token = await GetAntiforgeryTokenAsync(client, "/Usuarios/Create");
+
+        Dictionary<string, string> form = new()
+        {
+            ["Nombre"] = string.Empty,
+            ["__RequestVerificationToken"] = token,
+        };
+
+        HttpResponseMessage response = await client.PostAsync("/Usuarios/Create", new FormUrlEncodedContent(form));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        int cantidadDespues = await ContarUsuariosAsync();
+
+        Assert.Equal(cantidadAntes, cantidadDespues);
+    }
+
+    [Fact]
+    public async Task GetEditarUsuarioExistente_Devuelve200YElFormularioPrecargado()
+    {
+        using HttpClient client = CreateAuthenticatedClient();
+
+        await LoginAsAdminAsync(client);
+        await SeedUsuarioAsync("Usuario Para Editar", activo: true);
+
+        int id = await ObtenerIdPorNombreAsync("Usuario Para Editar");
+
+        HttpResponseMessage response = await client.GetAsync($"/Usuarios/Edit/{id}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        string body = await response.Content.ReadAsStringAsync();
+
+        Assert.Contains("value=\"Usuario Para Editar\"", body);
+    }
+
+    [Fact]
+    public async Task PostEdit_ConNombreValido_RedirigeYElListadoReflejaElNombreActualizado()
+    {
+        using HttpClient client = CreateAuthenticatedClient(allowAutoRedirect: false);
+
+        await LoginAsAdminAsync(client);
+        await SeedUsuarioAsync("Nombre Original", activo: true);
+
+        int id = await ObtenerIdPorNombreAsync("Nombre Original");
+
+        string token = await GetAntiforgeryTokenAsync(client, $"/Usuarios/Edit/{id}");
+
+        Dictionary<string, string> form = new()
+        {
+            ["Id"] = id.ToString(),
+            ["Nombre"] = "Nombre Actualizado",
+            ["__RequestVerificationToken"] = token,
+        };
+
+        HttpResponseMessage response = await client.PostAsync($"/Usuarios/Edit/{id}", new FormUrlEncodedContent(form));
+
+        Assert.Equal(HttpStatusCode.Found, response.StatusCode);
+
+        using HttpClient listadoClient = CreateAuthenticatedClient();
+        await LoginAsAdminAsync(listadoClient);
+        HttpResponseMessage listado = await listadoClient.GetAsync("/Usuarios");
+        string body = await listado.Content.ReadAsStringAsync();
+
+        Assert.Contains("Nombre Actualizado", body);
+    }
+
+    [Fact]
+    public async Task PostEdit_ConNombreVacio_NoRedirigeYNoAplicaElCambio()
+    {
+        using HttpClient client = CreateAuthenticatedClient(allowAutoRedirect: false);
+
+        await LoginAsAdminAsync(client);
+        await SeedUsuarioAsync("Nombre Sin Cambios", activo: true);
+
+        int id = await ObtenerIdPorNombreAsync("Nombre Sin Cambios");
+
+        string token = await GetAntiforgeryTokenAsync(client, $"/Usuarios/Edit/{id}");
+
+        Dictionary<string, string> form = new()
+        {
+            ["Id"] = id.ToString(),
+            ["Nombre"] = string.Empty,
+            ["__RequestVerificationToken"] = token,
+        };
+
+        HttpResponseMessage response = await client.PostAsync($"/Usuarios/Edit/{id}", new FormUrlEncodedContent(form));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        using HttpClient listadoClient = CreateAuthenticatedClient();
+        await LoginAsAdminAsync(listadoClient);
+        HttpResponseMessage listado = await listadoClient.GetAsync("/Usuarios");
+        string body = await listado.Content.ReadAsStringAsync();
+
+        Assert.Contains("Nombre Sin Cambios", body);
+    }
+
+    [Fact]
+    public async Task PostDarDeBaja_ConIdExistenteYActivo_RedirigeYElListadoMuestraInactivo()
+    {
+        using HttpClient client = CreateAuthenticatedClient(allowAutoRedirect: false);
+
+        await LoginAsAdminAsync(client);
+        await SeedUsuarioAsync("Usuario A Dar De Baja", activo: true);
+
+        int id = await ObtenerIdPorNombreAsync("Usuario A Dar De Baja");
+
+        string token = await GetAntiforgeryTokenAsync(client, "/Usuarios");
+
+        Dictionary<string, string> form = new()
+        {
+            ["__RequestVerificationToken"] = token,
+        };
+
+        HttpResponseMessage response = await client.PostAsync($"/Usuarios?handler=DarDeBaja&id={id}", new FormUrlEncodedContent(form));
+
+        Assert.Equal(HttpStatusCode.Found, response.StatusCode);
+
+        using HttpClient listadoClient = CreateAuthenticatedClient();
+        await LoginAsAdminAsync(listadoClient);
+        HttpResponseMessage listado = await listadoClient.GetAsync("/Usuarios");
+        string body = await listado.Content.ReadAsStringAsync();
+
+        Assert.Matches(
+            new Regex(@"<td>Usuario A Dar De Baja</td>\s*<td>Inactivo</td>"),
+            body);
+    }
+
+    /// <summary>
+    /// Resuelve el <c>Id</c> de un usuario sembrado por su nombre, consultando directamente el
+    /// <see cref="SsoAdminDbContext"/> del host bajo test (mismo criterio que
+    /// <see cref="SeedUsuarioAsync"/>).
+    /// </summary>
+    private async Task<int> ObtenerIdPorNombreAsync(string nombre)
+    {
+        using IServiceScope scope = _factory.Services.CreateScope();
+        SsoAdminDbContext db = scope.ServiceProvider.GetRequiredService<SsoAdminDbContext>();
+
+        Usuario usuario = await db.Usuarios.SingleAsync(u => u.Nombre == nombre);
+
+        return usuario.Id;
     }
 
     public void Dispose()
