@@ -6,7 +6,7 @@
 | PRD | docs/daw/prd/prd-FEAT-001.md |
 | Tier | FEATURE |
 | Date | 2026-08-17T13:45:44Z |
-| Spec loops | 2 |
+| Spec loops | 3 |
 
 ## Summary
 
@@ -109,7 +109,17 @@ las referencias de proyecto correctas (`dotnet list <proj> reference`).
 - `src/SsoAdmin.Data/Configurations/LoginConfiguration.cs` (new) — `IEntityTypeConfiguration<Login>`
 - `src/SsoAdmin.Data/Migrations/*` (new) — migración inicial generada con
   `dotnet ef migrations add InitialCreate`
-- `src/SsoAdmin.Data/Seed/AdminLoginSeeder.cs` (new) — clase con
+- `src/SsoAdmin.Data/SsoAdminDbContextFactory.cs` (new, no previsto originalmente) —
+  `IDesignTimeDbContextFactory<SsoAdminDbContext>`. `SsoAdminDbContext` no tiene constructor sin
+  parámetros (recibe `DbContextOptions<T>` inyectado), así que `dotnet ef migrations add` no puede
+  instanciarlo en tiempo de diseño sin esta factory. Es tooling de build-time — no participa del
+  arranque real, que sigue registrando el contexto vía `AddDbContext` con la connection string de
+  `appsettings.json`.
+- `src/SsoAdmin.Application/Seed/AdminLoginSeeder.cs` (new — **ruta corregida en CODE**: el spec
+  original decía `src/SsoAdmin.Data/Seed/`, pero la firma que este mismo bloque exige
+  (`IPasswordHasherService`, que vive en `SsoAdmin.Application.Auth`) sólo compila si el seeder
+  está en `Application`: `Data` no puede referenciar `Application` sin crear un ciclo, ya que
+  `Application` ya referencia `Data` desde Block 1) — clase con
   `Task SeedAsync(SsoAdminDbContext db, IPasswordHasherService hasher)`, precarga `admin`/`admin`
   solo si `Login` está vacía
 - `src/SsoAdmin.Web/Program.cs` (modified) — registra `SsoAdminDbContext` (SQLite,
@@ -164,10 +174,11 @@ Es la migración inicial (`InitialCreate`): no hay un esquema previo al que volv
 ## Block 3 — Login básico y autorización
 
 **Files**
-- `src/SsoAdmin.Application/Auth/IPasswordHasherService.cs` (new) — interfaz: `string Hash(string
-  password)`, `bool Verify(string hash, string password)`
-- `src/SsoAdmin.Application/Auth/PasswordHasherService.cs` (new) — implementación con
-  `PasswordHasher<Login>` (el `TUser` genérico no se usa realmente, es un adaptador)
+- `src/SsoAdmin.Application/Auth/IPasswordHasherService.cs` (**modified, creado en Block 2** con
+  solo `string Hash(string password)`) — agregar `bool Verify(string hash, string password)`
+- `src/SsoAdmin.Application/Auth/PasswordHasherService.cs` (**modified, creado en Block 2**) —
+  agregar la implementación de `Verify` con `PasswordHasher<Login>.VerifyHashedPassword` (el
+  `TUser` genérico no se usa realmente, es un adaptador)
 - `src/SsoAdmin.Application/Auth/IAuthenticationService.cs` (new) — `Task<bool>
   ValidateCredentialsAsync(string username, string password)`
 - `src/SsoAdmin.Application/Auth/AuthenticationService.cs` (new) — busca en `Login` por
