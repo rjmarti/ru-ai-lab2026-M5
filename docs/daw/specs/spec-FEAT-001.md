@@ -6,7 +6,7 @@
 | PRD | docs/daw/prd/prd-FEAT-001.md |
 | Tier | FEATURE |
 | Date | 2026-08-17T13:45:44Z |
-| Spec loops | 3 |
+| Spec loops | 4 |
 
 ## Summary
 
@@ -29,7 +29,7 @@ resto de ASP.NET Identity). El seed del usuario `admin`/`admin` se aplica en el 
 | FR-03 | Block 2 |
 | FR-04 | Block 2 |
 | FR-05 | Block 3 |
-| FR-06 | Block 3 |
+| FR-06 | Block 3 (mecanismo configurado), Block 4 (verificado end-to-end contra `/Usuarios` real) |
 | FR-07 | Block 4 |
 | FR-08 | Block 4 |
 | FR-09 | Block 4 |
@@ -221,16 +221,29 @@ Es la migración inicial (`InitialCreate`): no hay un esquema previo al que volv
   contra una base con el seed aplicado — valida AC-03.
 - [ ] Test: `ValidateCredentialsAsync("admin", "wrong")` devuelve `false` — valida AC-04.
 - [ ] Test de integración web (`WebApplicationFactory`): `POST /Login` con credenciales válidas
-  responde con el cookie de auth seteado y redirige a `/Usuarios` — valida AC-03.
-- [ ] Test de integración web: `GET /Usuarios` sin cookie de sesión redirige a `/Login` — valida
-  AC-05.
+  responde con el cookie de auth seteado y con `Redirect`/`Location` apuntando a `/Usuarios` —
+  valida AC-03.
+- [ ] Test de integración web: `POST /Login` con credenciales inválidas responde `401` con el
+  mensaje genérico ("usuario o contraseña incorrectos") y sin cookie de auth — valida AC-04.
 - [ ] Test de integración web: tras un `POST /Login` exitoso, el `Set-Cookie` de respuesta tiene
   los atributos `HttpOnly` y `SameSite=Strict` — valida la mitigación R2 del threat model.
+- [ ] Test de configuración: `CookieAuthenticationOptions.LoginPath == "/Login"` — evidencia
+  intermedia de AC-05 hasta que exista una página protegida real (ver nota).
+
+> **Nota de secuenciación (agregada en CODE, ronda de revisión de Block 3):** el test end-to-end
+> real "`GET /Usuarios` sin cookie de sesión redirige a `/Login`" NO puede escribirse en este
+> bloque — `/Usuarios` es la página que crea Block 4. El spec original lo pedía acá por error de
+> secuenciación (la tabla "Coverage: PRD → blocks" asigna FR-06 a Block 3, pero la página que
+> ejercita esa autorización es de Block 4). **Este test se movió a los "Required tests" de Block
+> 4**, donde sí hay una página real contra la cual correrlo.
 
 **Completion criterion**
 
-Un usuario sin sesión que pide `/Usuarios` termina en `/Login`; con `admin`/`admin` accede; con
-credenciales inválidas no accede y ve el error.
+Un usuario sin sesión que pide `/Usuarios` (una vez que Block 4 cree esa página) termina en
+`/Login`; con `admin`/`admin` accede; con credenciales inválidas no accede y ve el error genérico.
+Dentro de este bloque, la evidencia disponible es: credenciales válidas/inválidas correctamente
+distinguidas por `AuthenticationService`, cookie endurecida emitida en éxito, y `LoginPath`
+correctamente configurado.
 
 ## Block 4 — Administración de Usuarios (CRUD web)
 
@@ -276,6 +289,9 @@ credenciales inválidas no accede y ve el error.
   operaciones anteriores — valida AC-07/AC-08/AC-09.
 - [ ] Test de integración web autenticado: `GET /Usuarios` devuelve `200` y el listado — valida
   AC-06.
+- [ ] Test de integración web: `GET /Usuarios` **sin** cookie de sesión redirige a `/Login` —
+  valida AC-05, FR-06 (movido desde Block 3 — ver nota de secuenciación en ese bloque; recién acá
+  existe una página real protegida contra la cual ejercitarlo end-to-end).
 - [ ] Test: `UsuarioService.EditarNombreAsync`/`DarDeBajaAsync` con un `Id` inexistente no lanza
   una excepción no controlada — devuelven un resultado que el `PageModel` traduce a `NotFound()`
   — valida el manejo de error documentado en este bloque.

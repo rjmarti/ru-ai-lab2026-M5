@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
 using SsoAdmin.Application.Auth;
 using SsoAdmin.Application.Seed;
@@ -17,6 +18,22 @@ if (string.IsNullOrWhiteSpace(connectionString))
 
 builder.Services.AddDbContext<SsoAdminDbContext>(options => options.UseSqlite(connectionString));
 builder.Services.AddScoped<IPasswordHasherService, PasswordHasherService>();
+builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
+
+// Cookie auth endurecida (mitigación R2 del threat model, docs/daw/security/threat-FEAT-001.md):
+// HttpOnly + Secure + SameSite=Strict, expiración de 8h con sliding expiration. LoginPath queda
+// listo para que Block 4 proteja /Usuarios/* con [Authorize]/RequireAuthorization().
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(options =>
+    {
+        options.LoginPath = "/Login";
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+        options.Cookie.SameSite = SameSiteMode.Strict;
+        options.ExpireTimeSpan = TimeSpan.FromHours(8);
+        options.SlidingExpiration = true;
+    });
+builder.Services.AddAuthorization();
 
 WebApplication app = builder.Build();
 
@@ -32,6 +49,7 @@ app.UseHttpsRedirection();
 
 app.UseRouting();
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapStaticAssets();

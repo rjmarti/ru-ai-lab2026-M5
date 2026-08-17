@@ -27,6 +27,14 @@
                             <a class="nav-link text-dark" asp-area="" asp-page="/Privacy">Privacy</a>
                         </li>
                     </ul>
+                    @if (User.Identity is not null && User.Identity.IsAuthenticated)
+                    {
+                        <form method="post" asp-page="/Logout" class="d-flex">
+                            <button type="submit" class="nav-link btn btn-link text-dark">
+                                Cerrar sesión (@User.Identity.Name)
+                            </button>
+                        </form>
+                    }
                 </div>
             </div>
         </nav>

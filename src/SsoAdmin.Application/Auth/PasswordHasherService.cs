@@ -18,4 +18,15 @@ public class PasswordHasherService : IPasswordHasherService
     {
         return _passwordHasher.HashPassword(user: null!, password: password);
     }
+
+    /// <inheritdoc />
+    public bool Verify(string hash, string password)
+    {
+        PasswordVerificationResult result = _passwordHasher.VerifyHashedPassword(
+            user: null!,
+            hashedPassword: hash,
+            providedPassword: password);
+
+        return result is PasswordVerificationResult.Success or PasswordVerificationResult.SuccessRehashNeeded;
+    }
 }
