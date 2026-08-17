@@ -39,6 +39,9 @@ ScaffoldingReadMe.txt
 # dotenv environment variables file
 .env
 
+# SQLite database files (SsoAdmin.Web local dev database)
+*.db
+
 # Others
 ~$*
 *~

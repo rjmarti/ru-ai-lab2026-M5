@@ -6,7 +6,7 @@
 | PRD | docs/daw/prd/prd-FEAT-001.md |
 | Tier | FEATURE |
 | Date | 2026-08-17T13:45:44Z |
-| Spec loops | 1 |
+| Spec loops | 2 |
 
 ## Summary
 
@@ -59,8 +59,12 @@ el CRUD de Usuarios).
   `SsoAdmin.Application`, paquete `Microsoft.AspNetCore.Authentication.Cookies` (incluido en el
   SDK web, sin paquete adicional)
 - `src/SsoAdmin.Test/SsoAdmin.Test.csproj` (new) — proyecto de test xUnit, referencia
-  `SsoAdmin.Application`, `SsoAdmin.Data` y `Microsoft.EntityFrameworkCore.InMemory` (para tests
-  sin SQLite físico)
+  `SsoAdmin.Application`, `SsoAdmin.Data`, **y `SsoAdmin.API`** (única excepción a "ningún
+  proyecto referencia `SsoAdmin.API`" — es imprescindible para instanciar
+  `WebApplicationFactory<Program>` contra el `Program` de `SsoAdmin.API` en el smoke test de
+  este mismo bloque; ningún proyecto de producción la referencia), `Microsoft.EntityFrameworkCore.InMemory`
+  y `Microsoft.AspNetCore.Mvc.Testing` (para tests sin SQLite físico y para el smoke test de
+  arranque)
 - `.gitignore` (modified) — agregar `src/**/bin/`, `src/**/obj/`, `*.db` si no están cubiertos ya
 
 **Logic**
