@@ -1,0 +1,45 @@
+@page
+@model SsoAdmin.Web.Pages.Usuarios.IndexModel
+@using SsoAdmin.Application.Usuarios
+@{
+    ViewData["Title"] = "Usuarios";
+}
+
+<h1>Usuarios</h1>
+
+<p>
+    <a asp-page="./Create" class="btn btn-primary">Nuevo usuario</a>
+</p>
+
+@* Form oculto solo para garantizar que siempre haya un antiforgery token disponible en la
+   página, incluso cuando el listado está vacío (los forms de "Dar de baja" de cada fila ya
+   incluyen uno propio cuando hay al menos un usuario activo). *@
+<form method="post" style="display:none">@Html.AntiForgeryToken()</form>
+
+<table class="table">
+    <thead>
+        <tr>
+            <th>Nombre</th>
+            <th>Estado</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (UsuarioDto usuario in Model.Usuarios)
+        {
+            <tr>
+                <td>@usuario.Nombre</td>
+                <td>@(usuario.Activo ? "Activo" : "Inactivo")</td>
+                <td>
+                    <a asp-page="./Edit" asp-route-id="@usuario.Id" class="btn btn-sm btn-secondary">Editar</a>
+                    @if (usuario.Activo)
+                    {
+                        <form method="post" asp-page-handler="DarDeBaja" asp-route-id="@usuario.Id" class="d-inline">
+                            <button type="submit" class="btn btn-sm btn-danger">Dar de baja</button>
+                        </form>
+                    }
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>

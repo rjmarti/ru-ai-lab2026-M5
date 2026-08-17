@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
 using SsoAdmin.Application.Auth;
 using SsoAdmin.Application.Seed;
+using SsoAdmin.Application.Usuarios;
 using SsoAdmin.Data;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
@@ -9,16 +10,29 @@ WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.AddRazorPages();
 
-string? connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-if (string.IsNullOrWhiteSpace(connectionString))
+// La connection string se resuelve de forma perezosa dentro del lambda, contra el
+// IConfiguration real del IServiceProvider del host, en vez de fijarla una única vez al ejecutar
+// este archivo. Evaluarla eager (leyendo builder.Configuration antes de builder.Build()) rompe el
+// aislamiento de WebApplicationFactory en tests de integración: el override de configuración vía
+// ConfigureAppConfiguration/ConfigureWebHost sólo queda aplicado en el IConfiguration del host
+// construido, y ese host no existe todavía en este punto del archivo. Resolverla dentro del
+// lambda difiere la lectura hasta que el DbContext se construye por scope/request, momento en el
+// que cualquier override ya está en efecto.
+builder.Services.AddDbContext<SsoAdminDbContext>((serviceProvider, options) =>
 {
-    throw new InvalidOperationException(
-        "La connection string 'DefaultConnection' no está configurada en appsettings.json.");
-}
+    IConfiguration configuration = serviceProvider.GetRequiredService<IConfiguration>();
+    string? connectionString = configuration.GetConnectionString("DefaultConnection");
+    if (string.IsNullOrWhiteSpace(connectionString))
+    {
+        throw new InvalidOperationException(
+            "La connection string 'DefaultConnection' no está configurada en appsettings.json.");
+    }
 
-builder.Services.AddDbContext<SsoAdminDbContext>(options => options.UseSqlite(connectionString));
+    options.UseSqlite(connectionString);
+});
 builder.Services.AddScoped<IPasswordHasherService, PasswordHasherService>();
 builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
+builder.Services.AddScoped<IUsuarioService, UsuarioService>();
 
 // Cookie auth endurecida (mitigación R2 del threat model, docs/daw/security/threat-FEAT-001.md):
 // HttpOnly + Secure + SameSite=Strict, expiración de 8h con sliding expiration. LoginPath queda
